@@ -27,6 +27,13 @@ jobs:
         with:
           ref: dev
 
+      # Setup .npmrc file to publish to GitHub Packages
+      - uses: actions/setup-node@v6.3.0
+        with:
+          node-version-file: '.node-version'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@mkljczk'
+
       - name: Configure Git
         run: |
           git config user.email "iam@jamesiv.es"
@@ -46,13 +53,6 @@ jobs:
         env:
           GITHUB_REF: ${{ github.ref }}
       - run: git push
-
-      # Setup .npmrc file to publish to GitHub Packages
-      - uses: actions/setup-node@v6.3.0
-        with:
-          node-version-file: '.node-version'
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@mkljczk'
 
       - name: Authenticate with the GitHub Package Registry
         run: |
