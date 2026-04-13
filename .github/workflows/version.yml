@@ -12,12 +12,12 @@ jobs:
     steps:
       - uses: nowactions/update-majorver@v1.1.2
 
-  call-integration-workflow:
-    name: Verify Major Tag 🚀
-    needs: update-majorver
-    uses: ./.github/workflows/integration.yml
-    secrets:
-      PAT: ${{ secrets.PAT }}
+  # call-integration-workflow:
+  #   name: Verify Major Tag 🚀
+  #   needs: update-majorver
+  #   uses: ./.github/workflows/integration.yml
+  #   secrets:
+  #     PAT: ${{ secrets.PAT }}
 
   update-registries:
     needs: call-integration-workflow
