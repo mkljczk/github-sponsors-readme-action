@@ -205,31 +205,28 @@ export function generateTemplate(
       )
     }
 
-    const mergedSponsors = filteredSponsors.reduce(
-      (merged, sponsor, index) => {
-        const sponsorLogin = sponsor.sponsorEntity.login
-          ? sponsor.sponsorEntity.login.toLowerCase()
-          : ''
-        const key = !isNullOrUndefined(sponsorLogin)
-          ? sponsorLogin
-          : `private-${index}`
-        const existingSponsor = merged.get(key)
+    const mergedSponsors = filteredSponsors.reduce((merged, sponsor, index) => {
+      const sponsorLogin = sponsor.sponsorEntity.login
+        ? sponsor.sponsorEntity.login.toLowerCase()
+        : ''
+      const key = !isNullOrUndefined(sponsorLogin)
+        ? sponsorLogin
+        : `private-${index}`
+      const existingSponsor = merged.get(key)
 
-        if (existingSponsor) {
-          existingSponsor.sponsoredAccountsCount += 1
-          return merged
-        }
-
-        merged.set(key, {
-          sponsor,
-          sponsoredAccountsCount: 1,
-          firstSeenIndex: index
-        })
-
+      if (existingSponsor) {
+        existingSponsor.sponsoredAccountsCount += 1
         return merged
-      },
-      new Map<string, MergedSponsor>()
-    )
+      }
+
+      merged.set(key, {
+        sponsor,
+        sponsoredAccountsCount: 1,
+        firstSeenIndex: index
+      })
+
+      return merged
+    }, new Map<string, MergedSponsor>())
 
     const orderedSponsors = [...mergedSponsors.values()]
       .sort((a, b) => {

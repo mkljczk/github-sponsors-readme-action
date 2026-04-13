@@ -6,7 +6,7 @@ import {isNullOrUndefined} from './util'
  */
 export interface ActionInterface {
   /**
-  * Deployment token(s). Multiple PATs can be provided as a comma or newline separated list.
+   * Deployment token(s). Multiple PATs can be provided as a comma or newline separated list.
    */
   token?: string
   /**
