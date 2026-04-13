@@ -77,6 +77,82 @@ describe('template', () => {
       )
     })
 
+    it('should merge duplicate sponsors and prioritize those sponsoring multiple accounts', () => {
+      const response: GitHubResponse = {
+        data: {
+          viewer: {
+            sponsorshipsAsMaintainer: {
+              totalCount: 3,
+              pageInfo: {
+                endCursor: 'MQ'
+              },
+              nodes: [
+                {
+                  createdAt: '123',
+                  privacyLevel: PrivacyLevel.PUBLIC,
+                  tier: {
+                    monthlyPriceInCents: 5000
+                  },
+                  sponsorEntity: {
+                    name: 'Alice',
+                    login: 'alice',
+                    url: 'https://github.com/alice',
+                    websiteUrl: 'https://example.com',
+                    avatarUrl: 'https://github.com/alice.png'
+                  }
+                },
+                {
+                  createdAt: '124',
+                  privacyLevel: PrivacyLevel.PUBLIC,
+                  tier: {
+                    monthlyPriceInCents: 5000
+                  },
+                  sponsorEntity: {
+                    name: 'Bob',
+                    login: 'bob',
+                    url: 'https://github.com/bob',
+                    websiteUrl: 'https://example.com',
+                    avatarUrl: 'https://github.com/bob.png'
+                  }
+                },
+                {
+                  createdAt: '125',
+                  privacyLevel: PrivacyLevel.PUBLIC,
+                  tier: {
+                    monthlyPriceInCents: 5000
+                  },
+                  sponsorEntity: {
+                    name: 'Alice',
+                    login: 'alice',
+                    url: 'https://github.com/alice',
+                    websiteUrl: 'https://example.com',
+                    avatarUrl: 'https://github.com/alice.png'
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+
+      const action = {
+        token: '123',
+        file: 'README.test.md',
+        template: '<span>{{ login }}:{{ sponsoredAccountsCount }}</span>',
+        minimum: 0,
+        maximum: 0,
+        marker: 'sponsors',
+        organization: false,
+        fallback: '',
+        activeOnly: true,
+        includePrivate: false
+      }
+
+      expect(generateTemplate(response, action)).toEqual(
+        '<span>alice:2</span><span>bob:1</span>'
+      )
+    })
+
     it('should generate the default template and sanitize user inputs', () => {
       const response: GitHubResponse = {
         data: {
@@ -826,16 +902,133 @@ describe('template', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        json: jest.fn().mockResolvedValue({data: '12345'})
+        json: jest.fn().mockResolvedValue({
+          data: {
+            viewer: {
+              sponsorshipsAsMaintainer: {
+                totalCount: 1,
+                pageInfo: {
+                  endCursor: 'MQ'
+                },
+                nodes: [
+                  {
+                    createdAt: '123',
+                    privacyLevel: PrivacyLevel.PUBLIC,
+                    tier: {
+                      monthlyPriceInCents: 1000
+                    },
+                    sponsorEntity: {
+                      name: 'Alice',
+                      login: 'alice',
+                      url: 'https://github.com/alice',
+                      websiteUrl: 'https://alice.com',
+                      avatarUrl: 'https://github.com/alice.png'
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        })
       })
 
       const data = await getSponsors(action)
 
-      expect(data).toEqual({data: '12345'})
+      expect(data.data.viewer?.sponsorshipsAsMaintainer.nodes).toHaveLength(1)
       expect(global.fetch).toHaveBeenCalledWith(
         'https://api.github.com/graphql',
         expect.any(Object)
       )
+    })
+
+    it('should merge data from multiple PAT values', async () => {
+      const action = {
+        token: 'token-one,token-two',
+        file: 'README.test.md',
+        template:
+          '<a href="https://github.com/{{ login }}"><img src="https://github.com/{{ login }}.png" width="60px" alt="" /></a>',
+        minimum: 6000,
+        maximum: 10000,
+        marker: 'sponsors',
+        organization: false,
+        fallback: 'There are no sponsors in this tier',
+        activeOnly: true,
+        includePrivate: false
+      }
+
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({
+          json: jest.fn().mockResolvedValue({
+            data: {
+              viewer: {
+                sponsorshipsAsMaintainer: {
+                  totalCount: 1,
+                  pageInfo: {
+                    endCursor: 'MQ'
+                  },
+                  nodes: [
+                    {
+                      createdAt: '123',
+                      privacyLevel: PrivacyLevel.PUBLIC,
+                      tier: {
+                        monthlyPriceInCents: 1000
+                      },
+                      sponsorEntity: {
+                        name: 'Alice',
+                        login: 'alice',
+                        url: 'https://github.com/alice',
+                        websiteUrl: 'https://alice.com',
+                        avatarUrl: 'https://github.com/alice.png'
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          })
+        })
+        .mockResolvedValueOnce({
+          json: jest.fn().mockResolvedValue({
+            data: {
+              viewer: {
+                sponsorshipsAsMaintainer: {
+                  totalCount: 1,
+                  pageInfo: {
+                    endCursor: 'MQ'
+                  },
+                  nodes: [
+                    {
+                      createdAt: '124',
+                      privacyLevel: PrivacyLevel.PUBLIC,
+                      tier: {
+                        monthlyPriceInCents: 1000
+                      },
+                      sponsorEntity: {
+                        name: 'Bob',
+                        login: 'bob',
+                        url: 'https://github.com/bob',
+                        websiteUrl: 'https://bob.com',
+                        avatarUrl: 'https://github.com/bob.png'
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          })
+        })
+
+      const data = await getSponsors(action)
+
+      expect(global.fetch).toHaveBeenCalledTimes(2)
+      expect(data.data.viewer?.sponsorshipsAsMaintainer.nodes).toHaveLength(2)
+      expect(
+        data.data.viewer?.sponsorshipsAsMaintainer.nodes[0].sponsorEntity.login
+      ).toBe('alice')
+      expect(
+        data.data.viewer?.sponsorshipsAsMaintainer.nodes[1].sponsorEntity.login
+      ).toBe('bob')
     })
 
     it('should return some data as organization', async () => {
@@ -854,12 +1047,41 @@ describe('template', () => {
       }
 
       global.fetch = jest.fn().mockResolvedValue({
-        json: jest.fn().mockResolvedValue({data: '12345'})
+        json: jest.fn().mockResolvedValue({
+          data: {
+            organization: {
+              sponsorshipsAsMaintainer: {
+                totalCount: 1,
+                pageInfo: {
+                  endCursor: 'MQ'
+                },
+                nodes: [
+                  {
+                    createdAt: '123',
+                    privacyLevel: PrivacyLevel.PUBLIC,
+                    tier: {
+                      monthlyPriceInCents: 1000
+                    },
+                    sponsorEntity: {
+                      name: 'Alice',
+                      login: 'alice',
+                      url: 'https://github.com/alice',
+                      websiteUrl: 'https://alice.com',
+                      avatarUrl: 'https://github.com/alice.png'
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        })
       })
 
       const data = await getSponsors(action)
 
-      expect(data).toEqual({data: '12345'})
+      expect(
+        data.data.organization?.sponsorshipsAsMaintainer.nodes
+      ).toHaveLength(1)
       expect(global.fetch).toHaveBeenCalledWith(
         'https://api.github.com/graphql',
         expect.any(Object)

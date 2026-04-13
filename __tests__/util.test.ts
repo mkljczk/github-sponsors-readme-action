@@ -2,7 +2,8 @@ import {
   checkParameters,
   extractErrorMessage,
   suppressSensitiveInformation,
-  isNullOrUndefined
+  isNullOrUndefined,
+  parseTokens
 } from '../src/util'
 
 describe('util', () => {
@@ -31,6 +32,29 @@ describe('util', () => {
   describe('hasRequiredParameters', () => {
     it('should fail if there is no provided Access Token', () => {
       const action = {
+        file: 'README.test.md',
+        template: '* {{ url }}',
+        minimum: 0,
+        maximum: 0,
+        marker: 'sponsors',
+        organization: false,
+        fallback: '',
+        activeOnly: true,
+        includePrivate: false
+      }
+
+      try {
+        checkParameters(action)
+      } catch (error) {
+        expect(extractErrorMessage(error)).toMatch(
+          'No deployment token was provided. You must provide the action with a Personal Access Token scoped to user:read and org:read.'
+        )
+      }
+    })
+
+    it('should fail if token input cannot be parsed into valid PAT values', () => {
+      const action = {
+        token: ',\n  ,\n',
         file: 'README.test.md',
         template: '* {{ url }}',
         minimum: 0,
@@ -89,6 +113,40 @@ describe('util', () => {
       expect(suppressSensitiveInformation(string, action)).toBe(
         'This is an error message! It contains *** and *** again!'
       )
+    })
+
+    it('should replace any sensitive information with *** for multiple tokens', () => {
+      const action = {
+        token: 'insanelyimportanttokendonotsteal,anotherimportanttoken',
+        file: 'README.test.md',
+        template: '* {{ url }}',
+        minimum: 0,
+        maximum: 0,
+        marker: 'sponsors',
+        organization: false,
+        fallback: '',
+        activeOnly: true,
+        includePrivate: false
+      }
+
+      const string = `This has insanelyimportanttokendonotsteal and anotherimportanttoken in it.`
+      expect(suppressSensitiveInformation(string, action)).toBe(
+        'This has *** and *** in it.'
+      )
+    })
+  })
+
+  describe('parseTokens', () => {
+    it('should split comma and newline separated token values', () => {
+      expect(parseTokens(' token-a,token-b\ntoken-c ')).toEqual([
+        'token-a',
+        'token-b',
+        'token-c'
+      ])
+    })
+
+    it('should remove duplicate token values', () => {
+      expect(parseTokens('token-a, token-a,\ntoken-a')).toEqual(['token-a'])
     })
   })
 
