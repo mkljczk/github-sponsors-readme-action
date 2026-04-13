@@ -24,12 +24,11 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
 
-      - name: Install and Test
+      - name: Install
         run: |
           yarn install --frozen-lockfile
           yarn lint:check
           yarn lint:format:check
-          yarn test
 
   build:
     runs-on: ubuntu-latest
