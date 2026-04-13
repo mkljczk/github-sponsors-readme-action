@@ -12,9 +12,23 @@ import {
   extractErrorMessage,
   suppressSensitiveInformation,
   sanitizeAndClean,
-  replaceAll
+  replaceAll,
+  parseTokens,
+  isNullOrUndefined
 } from './util'
 import {info} from '@actions/core'
+
+interface MergedSponsor {
+  sponsor: Sponsor
+  sponsoredAccountsCount: number
+  firstSeenIndex: number
+}
+
+const getResponseData = (
+  response: GitHubResponse,
+  organization: boolean
+): GitHubResponse['data']['organization'] | GitHubResponse['data']['viewer'] =>
+  organization ? response?.data?.organization : response?.data?.viewer
 
 /**
  * Fetches sponsors from the GitHub Sponsors API.
@@ -23,8 +37,10 @@ export async function getSponsors(
   action: ActionInterface
 ): Promise<GitHubResponse> {
   try {
+    const tokens = parseTokens(action.token)
+
     info(
-      `Fetching data from the GitHub API as ${
+      `Fetching data from the GitHub API for ${tokens.length} account${tokens.length === 1 ? '' : 's'} as ${
         action.organization ? 'Organization' : 'User'
       }… ⚽`
     )
@@ -68,19 +84,50 @@ export async function getSponsors(
       }
     }`
 
-    const data = await fetch(`${Urls.GITHUB_API}/graphql`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${action.token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      },
-      body: JSON.stringify({
-        query
+    const responses = await Promise.all(
+      tokens.map(async token => {
+        const data = await fetch(`${Urls.GITHUB_API}/graphql`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json'
+          },
+          body: JSON.stringify({
+            query
+          })
+        })
+
+        return data.json() as Promise<GitHubResponse>
       })
+    )
+
+    const mergedNodes = responses.flatMap(response => {
+      const responseData = getResponseData(response, action.organization)
+      return responseData?.sponsorshipsAsMaintainer?.nodes || []
     })
 
-    return data.json()
+    const sponsorshipsAsMaintainer = {
+      totalCount: mergedNodes.length,
+      pageInfo: {
+        endCursor: ''
+      },
+      nodes: mergedNodes
+    }
+
+    return {
+      data: action.organization
+        ? {
+            organization: {
+              sponsorshipsAsMaintainer
+            }
+          }
+        : {
+            viewer: {
+              sponsorshipsAsMaintainer
+            }
+          }
+    }
   } catch (error) {
     throw new Error(
       `There was an error with the GitHub API request: ${suppressSensitiveInformation(
@@ -107,12 +154,7 @@ export function generateTemplate(
    * Performs checks to see if the data is available before we
    * reference it as the API results can be somewhat sporadic.
    */
-  const data =
-    action.organization && response?.data?.organization
-      ? response?.data?.organization
-      : response?.data?.viewer
-        ? response?.data?.viewer
-        : null
+  const data = getResponseData(response, action.organization)
 
   const sponsorshipsAsMaintainer = data?.sponsorshipsAsMaintainer
 
@@ -163,22 +205,62 @@ export function generateTemplate(
       )
     }
 
+    const mergedSponsors = filteredSponsors.reduce(
+      (merged, sponsor, index) => {
+        const sponsorLogin = sponsor.sponsorEntity.login
+          ? sponsor.sponsorEntity.login.toLowerCase()
+          : ''
+        const key = !isNullOrUndefined(sponsorLogin)
+          ? sponsorLogin
+          : `private-${index}`
+        const existingSponsor = merged.get(key)
+
+        if (existingSponsor) {
+          existingSponsor.sponsoredAccountsCount += 1
+          return merged
+        }
+
+        merged.set(key, {
+          sponsor,
+          sponsoredAccountsCount: 1,
+          firstSeenIndex: index
+        })
+
+        return merged
+      },
+      new Map<string, MergedSponsor>()
+    )
+
+    const orderedSponsors = [...mergedSponsors.values()]
+      .sort((a, b) => {
+        if (b.sponsoredAccountsCount !== a.sponsoredAccountsCount) {
+          return b.sponsoredAccountsCount - a.sponsoredAccountsCount
+        }
+
+        return a.firstSeenIndex - b.firstSeenIndex
+      })
+      .map(({sponsor, sponsoredAccountsCount}) => ({
+        ...sponsor,
+        sponsoredAccountsCount
+      }))
+
     info(
-      `Found ${filteredSponsors.length} matching ${filteredSponsors.length === 1 ? 'sponsor' : 'sponsors'}… ${filteredSponsors.length > 0 ? '🎉' : '😢'}`
+      `Found ${orderedSponsors.length} matching ${orderedSponsors.length === 1 ? 'sponsor' : 'sponsors'}… ${orderedSponsors.length > 0 ? '🎉' : '😢'}`
     )
 
     /**
      * If there are no valid sponsors then we return the provided fallback.
      */
-    if (!filteredSponsors.length) {
+    if (!orderedSponsors.length) {
       return action.fallback
     }
 
-    filteredSponsors.map(({sponsorEntity}) => {
+    orderedSponsors.map(({sponsorEntity, sponsoredAccountsCount}) => {
       /**
        * Sanitizes and cleans the sponsor data individually.
        */
       const sanitizedSponsorEntity = {
+        sponsoredAccountsCount,
         websiteUrl: sanitizeAndClean(
           sponsorEntity.websiteUrl || sponsorEntity.url
         ),

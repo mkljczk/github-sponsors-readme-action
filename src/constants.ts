@@ -6,7 +6,7 @@ import {isNullOrUndefined} from './util'
  */
 export interface ActionInterface {
   /**
-   * Deployment token.
+  * Deployment token(s). Multiple PATs can be provided as a comma or newline separated list.
    */
   token?: string
   /**
@@ -91,6 +91,7 @@ export interface Sponsor {
     avatarUrl?: string
     websiteUrl: string | null
   }
+  sponsoredAccountsCount?: number
   createdAt: string
   privacyLevel?: PrivacyLevel
   tier?: {

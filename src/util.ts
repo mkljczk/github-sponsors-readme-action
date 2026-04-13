@@ -1,4 +1,4 @@
-import {ActionInterface, RequiredActionParameters} from './constants'
+import {ActionInterface} from './constants'
 import {JSDOM} from 'jsdom'
 import DOMPurify from 'dompurify'
 
@@ -19,23 +19,27 @@ export const isNullOrUndefined = (value: string | undefined | null): boolean =>
   typeof value === 'undefined' || value === null || value === ''
 
 /**
- * Checks for the required tokens and formatting. Throws an error if any case is matched.
+ * Parses PAT input into a list of usable tokens.
  */
-const hasRequiredParameters = <K extends keyof RequiredActionParameters>(
-  action: ActionInterface,
-  params: K[]
-): boolean => {
-  const nonNullParams = params.filter(
-    param => !isNullOrUndefined(action[param])
-  )
-  return Boolean(nonNullParams.length)
+export const parseTokens = (tokenInput?: string): string[] => {
+  if (isNullOrUndefined(tokenInput)) {
+    return []
+  }
+
+  const tokens = tokenInput!
+    .replace(/\r/g, '\n')
+    .split(/[\n,]/)
+    .map(token => token.trim())
+    .filter(token => !isNullOrUndefined(token))
+
+  return [...new Set(tokens)]
 }
 
 /**
  * Verifies the action has the required parameters to run, otherwise throw an error.
  */
 export const checkParameters = (action: ActionInterface): void => {
-  if (!hasRequiredParameters(action, ['token'])) {
+  if (!parseTokens(action.token).length) {
     throw new Error(
       'No deployment token was provided. You must provide the action with a Personal Access Token scoped to user:read and org:read.'
     )
@@ -60,9 +64,9 @@ export const suppressSensitiveInformation = (
 ): string => {
   let value = str
 
-  const orderedByLength = (
-    [action.token, action.token].filter(Boolean) as string[]
-  ).sort((a, b) => b.length - a.length)
+  const orderedByLength = parseTokens(action.token).sort(
+    (a, b) => b.length - a.length
+  )
 
   for (const find of orderedByLength) {
     value = replaceAll(value, find, '***')
