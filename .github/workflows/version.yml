@@ -27,13 +27,6 @@ jobs:
         with:
           ref: dev
 
-      # Setup .npmrc file to publish to npm
-      - uses: actions/setup-node@v6.3.0
-        with:
-          node-version-file: '.node-version'
-          registry-url: 'https://registry.npmjs.org'
-          scope: '@jamesives'
-
       - name: Configure Git
         run: |
           git config user.email "iam@jamesiv.es"
