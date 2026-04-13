@@ -54,17 +54,12 @@ jobs:
           GITHUB_REF: ${{ github.ref }}
       - run: git push
 
-      # Publish to npm
-      - run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       # Setup .npmrc file to publish to GitHub Packages
       - uses: actions/setup-node@v6.3.0
         with:
           node-version-file: '.node-version'
           registry-url: 'https://npm.pkg.github.com'
-          scope: '@jamesives'
+          scope: '@mkljczk'
 
       - name: Authenticate with the GitHub Package Registry
         run: |
