@@ -1,4 +1,4 @@
-name: 'Add GitHub Sponsors to README'
+name: 'Add GitHub Sponsors list to README'
 description: 'This GitHub Action will automatically add your GitHub Sponsors to your README.'
 author: 'nicole mikołajczyk <git@mkljczk.pl>'
 runs:
