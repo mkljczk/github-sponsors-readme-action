@@ -36,8 +36,8 @@ jobs:
 
       - name: Configure Git
         run: |
-          git config user.email "iam@jamesiv.es"
-          git config user.name "James Ives"
+          git config user.email "git@mkljczk.pl"
+          git config user.name "nicole mikołajczyk"
 
       - name: Install Yarn
         run: npm install -g yarn
