@@ -61,13 +61,7 @@ export async function getSponsors(
           }
           nodes {
             sponsorEntity {
-              ... on Organization {
-                name
-                login
-                url
-                websiteUrl
-              }
-              ... on User {
+              ... on ${action.organization ? 'Organization' : 'User'} {
                 name
                 login
                 url
